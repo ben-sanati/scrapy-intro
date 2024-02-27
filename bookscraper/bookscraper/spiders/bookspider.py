@@ -2,7 +2,7 @@
 _summary_
 """
 import scrapy
-
+from bookscraper.items import BookItem
 
 class BookspiderSpider(scrapy.Spider):
     """
@@ -58,28 +58,22 @@ class BookspiderSpider(scrapy.Spider):
         Yields:
             _type_: _description_
         """
-        star_conversion = {
-            'One': 1,
-            'Two': 2,
-            'Three': 3,
-            'Four': 4,
-            'Five': 5,
-        }
+        book_item = BookItem()
         table_rows = response.css('table.table.table-striped tr')
-        star_rating_class = response.css('p.star-rating').attrib['class']
 
-        yield {
-            'url': response.url,
-            'title': response.css('h1::text').get(),
-            'UPC': table_rows[0].css('td::text').get(),
-            'Product Type': table_rows[1].css('td::text').get(),
-            'Price': response.css('p.price_color::text').get(),
-            'Price Excluding Tax': table_rows[2].css('td::text').get(),
-            'Price Including Tax': table_rows[3].css('td::text').get(),
-            'Tax': table_rows[4].css('td::text').get(),
-            'Availability': table_rows[5].css('td::text').get(),
-            'Number of Reviews': table_rows[6].css('td::text').get(),
-            'Stars': star_conversion[star_rating_class.split(' ')[1]],
-            'Category': response.xpath("//ul[@class='breadcrumb']/li[@class='active']/preceding-sibling::li[1]/a/text()").get(),
-            'Description': response.xpath("//div[@class='sub-header']/following-sibling::p/text()").get()
-        }
+        book_item['url'] = response.url,
+        book_item['title'] = response.css('h1::text').get(),
+        book_item['upc'] = table_rows[0].css('td::text').get(),
+        book_item['product_type'] = table_rows[1].css('td::text').get(),
+        book_item['price'] = response.css('p.price_color::text').get(),
+        book_item['price_excluding_tax'] = table_rows[2].css('td::text').get(),
+        book_item['price_including_tax'] = table_rows[3].css('td::text').get(),
+        book_item['tax'] = table_rows[4].css('td::text').get(),
+        book_item['availability'] = table_rows[5].css('td::text').get(),
+        book_item['number_of_reviews'] = table_rows[6].css('td::text').get(),
+        book_item['stars'] = response.css('p.star-rating').attrib['class'],
+        book_item['category'] = response.xpath("//ul[@class='breadcrumb']/li[@class='active']" \
+                                    "/preceding-sibling::li[1]/a/text()").get(),
+        book_item['description'] = response.xpath("//div[@class='sub-header']" \
+                                        "/following-sibling::p/text()").get()
+        yield book_item
