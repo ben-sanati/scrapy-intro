@@ -5,11 +5,15 @@
 
 
 # useful for handling different item types with a single interface
+import configparser
+import mysql.connector
+from mysql.connector import errorcode
+
 from itemadapter import ItemAdapter
 
 
 class BookscraperPipeline:
-    adapter: ItemAdapter = None
+    adapter: ItemAdapter
 
     def process_item(self, item, spider):
         self.adapter = ItemAdapter(item)
@@ -74,3 +78,94 @@ class BookscraperPipeline:
         split_stars_array = stars_string.split(' ')
         stars_text_value = split_stars_array[1].lower()
         self.adapter['stars'] = star_converter[stars_text_value]
+
+
+class SaveToMySQLPipeline:
+    def __init__(self):
+        # setup connection to MYSQL database
+        config = configparser.ConfigParser()
+        config.read('secrets.cfg')
+
+        self.conn = mysql.connector.connect(
+            host="localhost",
+            user=config['secrets']['mysql_user'],
+            password=config['secrets']['mysql_password'],
+            database="books"
+        )
+        self.cursor = self.conn.cursor()
+
+        # Create books table if none exists
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS books(
+            id int NOT NULL auto_increment, 
+            url VARCHAR(255),
+            title text,
+            upc VARCHAR(255),
+            product_type VARCHAR(255),
+            price DECIMAL,
+            price_excluding_tax DECIMAL,
+            price_including_tax DECIMAL,
+            tax DECIMAL,
+            availability INTEGER,
+            number_of_reviews INTEGER,
+            stars INTEGER,
+            category VARCHAR(255),
+            description text,
+            PRIMARY KEY (id)
+        )
+        """)
+
+    def process_item(self, item, spider):
+        ## Define insert statement
+        self.cursor.execute(""" insert into books (
+            url,
+            title,
+            upc,
+            product_type,
+            price,
+            price_excluding_tax,
+            price_including_tax,
+            tax,
+            availability,
+            number_of_reviews,
+            stars,
+            category,
+            description
+            ) values (
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s
+                )""", (
+            item["url"],
+            item["title"],
+            item["upc"],
+            item["product_type"],
+            item["price"],
+            item["price_excluding_tax"],
+            item["price_including_tax"],
+            item["tax"],
+            item["availability"],
+            item["number_of_reviews"],
+            item["stars"],
+            item["category"],
+            str(item["description"])
+        ))
+
+        ## Execute insert of data into database
+        self.conn.commit()
+        return item
+
+    def close_spider(self, spider):
+        # Close cursor & connection to database 
+        self.cursor.close()
+        self.conn.close()

@@ -18,6 +18,12 @@ class BookspiderSpider(scrapy.Spider):
     allowed_domains = ["books.toscrape.com"]
     start_urls = ["https://books.toscrape.com/"]
 
+    custom_settings = {
+        "FEEDS": {
+            "../bookdata.jsonl": {"format": "jsonlines", "overwrite": True}
+        }
+    }
+
     def parse(self, response):
         """
         _summary_
