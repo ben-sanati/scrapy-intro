@@ -2,8 +2,11 @@
 #
 # See documentation in:
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
-
+import requests
+from random import randint
+from urllib.parse import urlencode
 from scrapy import signals
+from scrapy.http import Headers
 
 # useful for handling different item types with a single interface
 from itemadapter import is_item, ItemAdapter
@@ -101,3 +104,101 @@ class BookscraperDownloaderMiddleware:
 
     def spider_opened(self, spider):
         spider.logger.info("Spider opened: %s" % spider.name)
+
+
+class ScrapeOpsFakeUserAgentMiddleware:
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        # ensures we have access to the crawler settings
+        return cls(crawler.settings)
+
+    def __init__(self, settings):
+        # this data is set in settings.py
+        self.scrapeops_api_key = settings.get('SCRAPEOPS_API_KEY')
+        self.scrapeops_endpoint = settings.get('SCRAPEOPS_FAKE_USER_AGENT_ENDPOINT', 'http://headers.scrapeops.io/v1/user-agents?') 
+        self.scrapeops_fake_user_agents_active = settings.get('SCRAPEOPS_FAKE_USER_AGENT_ENABLED', False)
+        self.scrapeops_num_results = settings.get('SCRAPEOPS_NUM_RESULTS') # this is the number of user-agents to get from scrapeops API
+
+        self.headers_list = []
+        self._get_user_agents_list()
+        self._scrapeops_fake_user_agents_enabled()
+
+    def _get_user_agents_list(self):
+        # get list of user-agents from scrapeops API
+        payload = {'api_key': self.scrapeops_api_key}
+        if self.scrapeops_num_results is not None:
+            payload['num_results'] = self.scrapeops_num_results
+        response = requests.get(self.scrapeops_endpoint, params=urlencode(payload))
+        json_response = response.json()
+        self.user_agents_list = json_response.get('result', [])
+
+    def _get_random_user_agent(self):
+        # select a random user-agent from the list of user-agents
+        random_index = randint(0, len(self.user_agents_list) - 1)
+        return self.user_agents_list[random_index]
+
+    def _scrapeops_fake_user_agents_enabled(self):
+        # check to see if we want to use fake user-agents
+        if self.scrapeops_api_key is None or self.scrapeops_api_key == '' or self.scrapeops_fake_user_agents_active == False:
+            self.scrapeops_fake_user_agents_active = False
+        else:
+            self.scrapeops_fake_user_agents_active = True
+
+    def process_request(self, request, spider):
+        # make request with a random fake user-agent
+        # process_request scrapy function overriden in middleware with new functionality
+        random_user_agent = self._get_random_user_agent()
+        request.headers['User-Agent'] = random_user_agent
+
+        print("*"*8 + " NEW HEADER ATTACHED " + "*"*8)
+        print(request.headers['User-Agent'])
+
+
+class ScrapeOpsFakeBrowserHeaderAgentMiddleware:
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        # ensures we have access to the crawler settings
+        return cls(crawler.settings)
+
+    def __init__(self, settings):
+        # this data is set in settings.py
+        self.scrapeops_api_key = settings.get('SCRAPEOPS_API_KEY')
+        self.scrapeops_endpoint = settings.get('SCRAPEOPS_FAKE_BROWSER_HEADER_ENDPOINT', 'http://headers.scrapeops.io/v1/browser-headers?') 
+        self.scrapeops_fake_browser_headers_active = settings.get('SCRAPEOPS_FAKE_BROWSER_HEADER_ENABLED', True)
+        self.scrapeops_num_results = settings.get('SCRAPEOPS_NUM_RESULTS') # this is the number of headers to get from scrapeops API
+
+        self.headers_list = []
+        self._get_headers_list()
+        self._scrapeops_fake_browser_headers_enabled()
+
+    def _get_headers_list(self):
+        # get list of headers from scrapeops API
+        payload = {'api_key': self.scrapeops_api_key}
+        if self.scrapeops_num_results is not None:
+            payload['num_results'] = self.scrapeops_num_results
+        response = requests.get(self.scrapeops_endpoint, params=urlencode(payload))
+        json_response = response.json()
+        self.headers_list = json_response.get('result', [])
+
+    def _get_random_browser_header(self):
+        # select a random header from the list of headers
+        random_index = randint(0, len(self.headers_list) - 1)
+        return self.headers_list[random_index]
+
+    def _scrapeops_fake_browser_headers_enabled(self):
+        # check to see if we want to use fake headers
+        if self.scrapeops_api_key is None or self.scrapeops_api_key == '' or self.scrapeops_fake_browser_headers_active == False:
+            self.scrapeops_fake_browser_headers_active = False
+        else:
+            self.scrapeops_fake_browser_headers_active = True
+
+    def process_request(self, request, spider):
+        # make request with a random fake header
+        # process_request scrapy function overriden in middleware with new functionality
+        random_browser_header = self._get_random_browser_header()
+        request.headers = Headers(random_browser_header)
+
+        print("*"*8 + " NEW HEADER ATTACHED " + "*"*8)
+        print(request.headers)
